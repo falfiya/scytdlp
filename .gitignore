@@ -2,7 +2,7 @@
 node_modules/
 out/
 cache/
-secrets.json
+config/secrets.json
 
 # Python-generated files
 __pycache__/

@@ -1,15 +1,17 @@
 import fs from "fs";
+
 import * as util from "./util";
+import {ConfigFile} from "../config";
 
 export class SoundCloudClient {
    static API_BASE = "https://api-v2.soundcloud.com/";
    static FETCH_CACHE = "cache"
-   static DEBOUNCE_MS = 5555;
 
    constructor (
       public Authorization: string,
       public client_id: string,
       public userID: string,
+      public config: ConfigFile,
    ) {}
 
    async *trackLikes(limit = 24) {
@@ -107,7 +109,7 @@ export class SoundCloudClient {
       util.Log.info("Fetching " + endpoint);
       util.Log.startGroup();
       const res = await fetch(url, {headers: {Authorization: this.Authorization}});
-      await util.sleep(SoundCloudClient.DEBOUNCE_MS);
+      await util.sleep(this.config.DEBOUNCE_MS);
 
       const contents = await res.arrayBuffer();
       const buf = Buffer.from(contents)
