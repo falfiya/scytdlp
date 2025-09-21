@@ -298,11 +298,22 @@ type Track = {
    duration: number;
    full_duration: number;
    // You know, there are many more but I have just realized that I don't care.
+   publisher_metadata: Publisher;
+   title: string;
    user: User;
+};
+
+type Publisher = {
+   artist: string;
+   album_title?: string;
 };
 
 type User = {
    avatar_url: string;
+   /**
+    * Username basically.
+    */
+   permalink: string;
 };
 
 type EpochString = `${number}-${number}-${number}T${number}:${number}:${number}Z`;
