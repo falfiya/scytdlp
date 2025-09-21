@@ -49,10 +49,6 @@ export class SoundCloudClient {
          throw new Error("Cannot cetch this url!")
       }
 
-      /**
-       * God help me I could not come up with a better name. It's not a cacheFile yet because it
-       * doesn't have the prefix and it's not base64 encoded.
-       */
       let cacheFile: string | null = null;
       for (const base of SoundCloudClient.KNOWN_URL_BASES) {
          if (url.startsWith(base[1])) {
