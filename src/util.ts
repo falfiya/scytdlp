@@ -36,14 +36,14 @@ function inspectPrefix(v: any, prefix: string): string {
 export class Log {
    private static indent = 0;
    private static getIndent(): string {
-      return "   ".repeat(Log.indent);
+      return " | ".repeat(Log.indent);
    }
 
-   static start() {
+   static startGroup() {
       Log.indent++;
    }
 
-   static end() {
+   static endGroup() {
       Log.indent--;
       if (Log.indent < 0) {
          Log.indent = 0;
@@ -51,14 +51,14 @@ export class Log {
    }
 
    static info(v: any) {
-      process.stderr.write(inspectPrefix(v, Log.getIndent() + colors.blue + "INF" + colors.reset));
+      process.stderr.write(inspectPrefix(v, colors.blue + "INF" + colors.reset + Log.getIndent()));
    }
 
    static warn(v: any) {
-      process.stderr.write(inspectPrefix(v, Log.getIndent() + colors.yellow + "WRN" + colors.reset));
+      process.stderr.write(inspectPrefix(v, colors.yellow + "WRN" + colors.reset + Log.getIndent()));
    }
 
    static error(v: any) {
-      process.stderr.write(inspectPrefix(v, Log.getIndent() + colors.red + "ERR" + colors.reset));
+      process.stderr.write(inspectPrefix(v, colors.red + "ERR" + colors.reset + Log.getIndent()));
    }
 }
