@@ -2,6 +2,7 @@
    "name": "scytdlp",
    "version": "0.0.1",
    "description": "Structured archival of SoundCloud likes and reposts",
+   "type": "module",
    "dependencies": {
       "esbuild": "^0.25.10",
       "ink": "^6.3.1",
