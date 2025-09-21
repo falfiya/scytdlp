@@ -30,7 +30,7 @@ export class SoundCloudClient {
          throw new Error("Cannot cetch this url!")
       }
 
-      const endpoint = url.slice(SoundCloudClient.API_BASE.length, 0);
+      const endpoint = url.slice(SoundCloudClient.API_BASE.length);
       const cacheFile = SoundCloudClient.FETCH_CACHE + "/" + Buffer.from(endpoint).toString("base64url");
 
       cached: {
