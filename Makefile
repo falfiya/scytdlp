@@ -15,5 +15,9 @@ opts += --packages=external
 build:
 	esbuild src/main.ts $(opts) --outfile=out/main.js
 
+migrate~%:
+	esbuild migrate/$*.ts $(opts) --outfile=out/migrate/$*.js
+	node out/migrate/$*
+
 typecheck:
 	tsc --noEmit
