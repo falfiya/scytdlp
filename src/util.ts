@@ -24,7 +24,12 @@ if (!process.stdout.isTTY) {
  * Calls inspect on the object and then prefixes each line with the provided prefix.
  */
 function inspectPrefix(v: any, prefix: string): string {
-   const msg = inspect(v, {colors: process.stdout.isTTY});
+   let msg: string;
+   if (typeof v === "string") {
+      msg = v;
+   } else {
+      msg = inspect(v, {colors: process.stdout.isTTY});
+   }
    return msg.split("\n").map(line => prefix + " " + line).join("\n") + "\n";
 }
 
