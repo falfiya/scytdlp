@@ -25,7 +25,7 @@ export class SoundCloudClient {
    async *trackLikes(limit = 24) {
       let nextHref = `${SoundCloudClient.API_BASE}users/${this.userID}/track_likes?client_id=${this.client_id}&limit=${limit}&offset=0`;
       while (true) {
-         const res = await this.fetch(nextHref, "json");
+         const res: TrackLikesResponse = await this.fetch(nextHref, "json");
          yield res;
          if (res.next_href) {
             nextHref = res.next_href;
@@ -266,3 +266,42 @@ export class SoundCloudClient {
       }
    }
 }
+
+type TrackLikesResponse = {
+   collection: TrackLikeObject[];
+   next_href: `${typeof SoundCloudClient.API_BASE}users/${number}/track_likes?offset=${string}&limit=${number}`;
+   query_urn: unknown;
+};
+
+type TrackLikeObject = {
+   /**
+    * If fetched through trackLikes, this is when you liked the track!
+    */
+   created_at: EpochString;
+   kind: "like" | string,
+   track: Track;
+};
+
+type Track = {
+   artwork_url: string;
+   caption: string | null;
+   commentable: boolean;
+   comment_count: number;
+   created_at: EpochString;
+   description: string;
+   /**
+    * Oh yeah?
+    */
+   downloadable: boolean;
+   download_count: number;
+   duration: number;
+   full_duration: number;
+   // You know, there are many more but I have just realized that I don't care.
+   user: User;
+};
+
+type User = {
+   avatar_url: string;
+};
+
+type EpochString = `${number}-${number}-${number}T${number}:${number}:${number}Z`;
