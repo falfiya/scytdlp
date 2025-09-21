@@ -25,6 +25,7 @@ export class SoundCloudClient {
    async *trackLikes(limit = 24) {
       let nextHref = `${SoundCloudClient.API_BASE}users/${this.userID}/track_likes?client_id=${this.client_id}&limit=${limit}&offset=0`;
       while (true) {
+         // @ts-expect-error
          const res: TrackLikesResponse = await this.fetch(nextHref, "json");
          yield res;
 
@@ -40,11 +41,11 @@ export class SoundCloudClient {
    /**
     * Fetch with a cache and some deserialization.
     */
-   async fetch(url: string, expectedFormat: null):                                     Promise<any>;
+   async fetch(url: string, expectedFormat: null):                                     Promise<unknown>;
    async fetch(url: string, expectedFormat: "binary"):                                 Promise<Buffer>;
    async fetch(url: string, expectedFormat: "text"):                                   Promise<string>;
-   async fetch(url: string, expectedFormat: "json"):                                   Promise<any>;
-   async fetch(url: string, expectedFormat: null | "binary" | "text" | "json" = null): Promise<any> {
+   async fetch(url: string, expectedFormat: "json"):                                   Promise<unknown>;
+   async fetch(url: string, expectedFormat: null | "binary" | "text" | "json" = null): Promise<unknown> {
       if (!url.startsWith(SoundCloudClient.API_BASE)) {
          throw new Error("Cannot cetch this url!")
       }
