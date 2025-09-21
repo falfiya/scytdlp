@@ -27,9 +27,13 @@ export class SoundCloudClient {
       while (true) {
          const res: TrackLikesResponse = await this.fetch(nextHref, "json");
          yield res;
-         if (res.next_href) {
+
+         if (!res.next_href)
+            break;
+         if (res.next_href === nextHref)
+            break;
+         else
             nextHref = res.next_href;
-         }
       }
    }
 
