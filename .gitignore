@@ -1,6 +1,8 @@
 # JavaScript ignores
 node_modules/
 out/
+cache/
+secrets.json
 
 # Python-generated files
 __pycache__/
