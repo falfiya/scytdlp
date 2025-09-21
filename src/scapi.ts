@@ -4,6 +4,7 @@ import * as util from "./util";
 export class SoundCloudClient {
    static API_BASE = "https://api-v2.soundcloud.com/";
    static FETCH_CACHE = "cache"
+   static DEBOUNCE_MS = 5555;
 
    constructor (
       public Authorization: string,
@@ -14,7 +15,7 @@ export class SoundCloudClient {
    async *trackLikes(limit = 24) {
       let nextHref = `${SoundCloudClient.API_BASE}users/${this.userID}/track_likes?client_id=${this.client_id}&limit=${limit}&offset=0`;
       while (true) {
-         const res = await this.fetch(nextHref);
+         const res = await this.fetch(nextHref, "json");
          yield res;
          if (res.next_href) {
             nextHref = res.next_href;
@@ -23,9 +24,13 @@ export class SoundCloudClient {
    }
 
    /**
-    * Fetch with a cache
+    * Fetch with a cache and some deserialization.
     */
-   async fetch(url: string): Promise<any> {
+   async fetch(url: string, expectedFormat: null):                                     Promise<any>;
+   async fetch(url: string, expectedFormat: "binary"):                                 Promise<Buffer>;
+   async fetch(url: string, expectedFormat: "text"):                                   Promise<string>;
+   async fetch(url: string, expectedFormat: "json"):                                   Promise<any>;
+   async fetch(url: string, expectedFormat: null | "binary" | "text" | "json" = null): Promise<any> {
       if (!url.startsWith(SoundCloudClient.API_BASE)) {
          throw new Error("Cannot cetch this url!")
       }
@@ -37,48 +42,126 @@ export class SoundCloudClient {
          let buf: Buffer;
          try {
             buf = fs.readFileSync(cacheFile);
+            util.Log.info("Cached " + endpoint);
          } catch (e) {
             break cached;
          }
 
+         util.Log.startGroup();
          let text: string;
          try {
             text = buf.toString("utf8")
          } catch (e) {
-            return buf;
+            switch (expectedFormat) {
+               case null:
+               case "binary":
+                  util.Log.endGroup();
+                  return buf;
+               case "text":
+               case "json":
+                  util.Log.warn(`Malformed cache. Expected ${expectedFormat}`);
+                  util.Log.endGroup();
+                  break cached;
+            }
          }
 
+         let val: any;
          try {
-            return JSON.parse(text);
+            val = JSON.parse(text);
          } catch (e) {
-            return text;
+            switch (expectedFormat) {
+               case "binary":
+                  util.Log.warn("utf8 recognized! Are you sure you wanted binary?");
+                  util.Log.endGroup();
+                  return buf;
+               case null:
+               case "text":
+                  util.Log.endGroup();
+                  return text;
+               case "json":
+                  util.Log.warn(`Malformed cache. Tried to parse JSON:`);
+
+                  util.Log.startGroup();
+                  util.Log.error(e);
+                  util.Log.endGroup();
+
+                  util.Log.endGroup();
+                  break cached;
+            }
+         }
+
+         util.Log.endGroup();
+         switch (expectedFormat) {
+            case "binary":
+               util.Log.warn(`json recognized! Are you sure you wanted binary?`);
+               return buf;
+            case "text":
+               util.Log.warn(`json recognized! Are you sure you wanted text?`);
+               return text;
+            case null:
+            case "json":
+               return val;
          }
       }
 
+      util.Log.info("Fetching " + endpoint);
+      util.Log.startGroup();
       const res = await fetch(url, {headers: {Authorization: this.Authorization}});
-      await util.sleep(333);
+      await util.sleep(SoundCloudClient.DEBOUNCE_MS);
+
+      const contents = await res.arrayBuffer();
+      const buf = Buffer.from(contents)
 
       let text: string;
       try {
-         text = await res.text();
+         text = buf.toString("utf8");
       } catch (e) {
-         // let's just ignore this and store it as binary
-         const contents = await res.arrayBuffer();
-         const buf = Buffer.from(contents)
-         fs.writeFileSync(cacheFile, buf);
-         return buf;
+         switch (expectedFormat) {
+            case null:
+            case "binary":
+               fs.writeFileSync(cacheFile, buf);
+               util.Log.endGroup();
+               return buf;
+            case "text":
+            case "json":
+               util.Log.endGroup();
+               throw e;
+         }
       }
 
-      let value: any;
+      let val: any;
       try {
-         value = JSON.parse(text);
+         val = JSON.parse(text);
       } catch (e) {
-         // it was just text and not json
-         fs.writeFileSync(cacheFile, text);
-         return text;
+         switch (expectedFormat) {
+            case "binary":
+               fs.writeFileSync(cacheFile, buf);
+               util.Log.warn("utf8 recognized! Are you sure you wanted binary?");
+               util.Log.endGroup();
+               return buf;
+            case null:
+            case "text":
+               fs.writeFileSync(cacheFile, text);
+               util.Log.endGroup();
+               return text;
+            case "json":
+               util.Log.endGroup();
+               throw e;
+         }
       }
 
-      fs.writeFileSync(cacheFile, util.dump(value));
-      return value;
+      util.Log.endGroup();
+      switch (expectedFormat) {
+         case "binary":
+            util.Log.warn(`json recognized! Are you sure you wanted binary?`);
+            return buf;
+         case "text":
+            util.Log.warn(`json recognized! Are you sure you wanted text?`);
+            return text;
+         case null:
+         case "json":
+            fs.writeFileSync(cacheFile, util.dump(val));
+            return val;
+      }
    }
 }
