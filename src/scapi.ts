@@ -4,8 +4,16 @@ import * as util from "./util";
 import {ConfigFile} from "../config";
 
 export class SoundCloudClient {
-   static API_BASE = "https://api-v2.soundcloud.com/";
-   static FETCH_CACHE = "cache"
+   static API_BASE = "https://api-v2.soundcloud.com/" as const;
+   static CDN_BASE = "https://i1.sndcdn.com/" as const;
+   private static FETCH_CACHE = "cache"
+
+   /** Priority list of shortenings. Lower is higher priority. */
+   private static KNOWN_URL_BASES: [key: string, base: string][] = [
+      ["h", "https://"],
+      ["0", this.API_BASE],
+      ["u", `${this.API_BASE}users/`],
+   ];
 
    constructor (
       public Authorization: string,
@@ -37,19 +45,110 @@ export class SoundCloudClient {
          throw new Error("Cannot cetch this url!")
       }
 
-      const endpoint = url.slice(SoundCloudClient.API_BASE.length);
-      const cacheFile = SoundCloudClient.FETCH_CACHE + "/" + Buffer.from(endpoint).toString("base64url");
+      /**
+       * God help me I could not come up with a better name. It's not a cacheFile yet because it
+       * doesn't have the prefix and it's not base64 encoded.
+       */
+      let cacheFile: string | null = null;
+      for (const base of SoundCloudClient.KNOWN_URL_BASES) {
+         if (url.startsWith(base[1])) {
+            cacheFile = SoundCloudClient.FETCH_CACHE + "/" + base[0] + Buffer.from(url.slice(base[1].length)).toString("base64url");
+         }
+      }
+      if (cacheFile == null) {
+         cacheFile = "-" +  Buffer.from(url).toString("base64url");
+      }
 
       cached: {
-         let buf: Buffer;
-         try {
-            buf = fs.readFileSync(cacheFile);
-            util.Log.info("Cached " + endpoint);
-         } catch (e) {
+         let buf: Buffer | null = null;
+         // Walk through potential cache files and read the newest one deleting
+         // the one before it.
+         let prevOldCacheFile: string | null = null;
+         let newestMtime: Date | null = null;
+         let newestCacheFile: string | null = null;
+         for (const base of SoundCloudClient.KNOWN_URL_BASES) {
+            if (!url.startsWith(base[1])) continue;
+            /**
+             * The cult chanted "Don't repeat yourself! Don't repeat yourself!"
+             *
+             * It echoed across the walls and into your mind.
+             *
+             * Think. THINK. THINK..
+             * You inhale, trying in vain to clear your mind.
+             * It's impossible, it's way too loud and they're already closing in on you.
+             * "What God do you worship!?", you scream out. The chanting continues.
+             * Even in the darkness of the cave, they're now close enough to see.
+             * A-a... a person covered from head to toe in cargo pants??
+             * Is that even possible? There's no sign of flesh, no sign of a mouth, yet the chanting
+             * continues. Oh if only the great cardinal were here. He would know what to do!
+             *
+             * But it's too late. They have activated the dehydrator. You will not be their first
+             * victim.
+             *
+             * -SILENCE-
+             *
+             * The chanting stops.
+             * Wait no, it hasn't stopped...?
+             *
+             * It's just extremely low pitched.
+             * It's almost like... time is moving slower??
+             *
+             * You remember what the cardinal said to you:
+             * "Accept the holy power of our lord and savior Klipp Borde".
+             * It seemed so obvious. It seemed like second nature.
+             *
+             * You look around, the cult members are hardly moving now.
+             *
+             * The first command of power: "CTRL+V" ---
+             * Your body feels light, you can feel a tingling sensation rise up through your nose
+             * and into your sinuses.
+             *
+             * The second command of power: "CTRL+C"
+             * You close your eyes and a single tear rolls down your cheek, hesitating on your chin-
+             * before falling unceremoniously to the ground.
+             *
+             * A geyser was born from the holy matrimony of the power granted to You by Klipp Borde,
+             * erupting in a magnificant fashion. One cult member is not so lucky, standing right
+             * above it, and is immediately disolved into the spring.
+             *
+             * Thank you, Klipp Borde! And let your powers reign forevermore!
+             */
+            const oldCacheFile =
+               SoundCloudClient.FETCH_CACHE + "/" + base[0] + Buffer.from(url.slice(base[1].length)).toString("base64url");
+
+            // Delete the one before this one if we can.
+            if (prevOldCacheFile != null) {
+               try {
+                  fs.unlinkSync(prevOldCacheFile);
+               } catch (e) {}
+            }
+            prevOldCacheFile = oldCacheFile;
+
+            // Only read this file if it's newer.
+            try {
+               const {mtime} = fs.statSync(oldCacheFile);
+               if (newestMtime == null || mtime > newestMtime) {
+                  buf = fs.readFileSync(oldCacheFile)
+                  newestCacheFile = oldCacheFile;
+                  newestMtime = mtime;
+               }
+            } catch (e) {
+               continue;
+            }
+         }
+
+         if (buf == null) {
             break cached;
          }
 
+         util.Log.info("Cached " + url);
          util.Log.startGroup();
+
+         if (newestCacheFile !== cacheFile) {
+            fs.writeFileSync(cacheFile, buf);
+            util.Log.info("Migrated file!");
+         }
+
          let text: string;
          try {
             text = buf.toString("utf8")
@@ -106,7 +205,7 @@ export class SoundCloudClient {
          }
       }
 
-      util.Log.info("Fetching " + endpoint);
+      util.Log.info("Fetching " + url);
       util.Log.startGroup();
       const res = await fetch(url, {headers: {Authorization: this.Authorization}});
       await util.sleep(this.config.DEBOUNCE_MS);

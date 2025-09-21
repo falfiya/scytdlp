@@ -1,6 +1,6 @@
 {
    "name": "scytdlp",
-   "version": "0.0.1",
+   "version": "0.0.2",
    "description": "Structured archival of SoundCloud likes and reposts",
    "type": "module",
    "dependencies": {
