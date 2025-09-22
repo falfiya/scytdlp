@@ -1,8 +1,11 @@
+# Application ignores
+cache/
+config/secrets.json
+archive/
+
 # JavaScript ignores
 node_modules/
 out/
-cache/
-config/secrets.json
 
 # Python-generated files
 __pycache__/
