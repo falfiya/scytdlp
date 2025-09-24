@@ -1,5 +1,5 @@
 {
-   "name": "scytdlp",
+   "name": "scarchive",
    "version": "0.0.3",
    "description": "Structured archival of SoundCloud likes and reposts",
    "type": "module",

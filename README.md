@@ -1,4 +1,4 @@
-# SoundCloud, meet my good friend yt-dlp
+# SCARchive
 
 🎵 *Structured archival of SoundCloud likes and reposts.*
 
