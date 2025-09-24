@@ -1,19 +1,10 @@
 # Application ignores
-cache/
+tmp/*/
+
 config/secrets.json
-archive/
+
+archive/*
+!archive/index.d.ts
 
 # JavaScript ignores
 node_modules/
-out/
-
-# Python-generated files
-__pycache__/
-*.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv

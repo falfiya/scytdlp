@@ -6,7 +6,7 @@ import {ConfigFile} from "../config";
 export class SoundCloudClient {
    static API_BASE = "https://api-v2.soundcloud.com/" as const;
    static CDN_BASE = "https://i1.sndcdn.com/" as const;
-   private static FETCH_CACHE = "cache"
+   private static FETCH_CACHE = "tmp/cache"
 
    /** Priority list of shortenings. Lower is higher priority. */
    private static KNOWN_URL_BASES: [key: string, base: string][] = [
