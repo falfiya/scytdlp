@@ -1,3 +1,4 @@
 {
-   "DEBOUNCE_MS": 4444
+   "DEVELOPMENT": true,
+   "DEBOUNCE_MS": 1111
 }

@@ -6,9 +6,14 @@ export const dump = (a: any) => JSON.stringify(a, null, 3);
 export const colors = {
    reset: "\x1b[0m",
    red: "\x1b[91m",
-   yellow: "\x1b[33m",
+   orange: "\x1b[33m",
+   yellow: "\x1b[93m",
    cyan: "\x1b[96m",
    blue: "\x1b[34m",
+   purple: "\x1b[35m",
+   magenta: "\x1b[95m",
+   grey: "\x1b[90m",
+   green: "\x1b[32m",
 };
 
 if (!process.stdout.isTTY) {
@@ -50,15 +55,21 @@ export class Log {
       }
    }
 
+   static debug(v: any) {
+      // process.stderr.write(inspectPrefix(v, colors.grey + "INF" + colors.reset + Log.getIndent()));
+   }
+
    static info(v: any) {
       process.stderr.write(inspectPrefix(v, colors.blue + "INF" + colors.reset + Log.getIndent()));
    }
 
    static warn(v: any) {
-      process.stderr.write(inspectPrefix(v, colors.yellow + "WRN" + colors.reset + Log.getIndent()));
+      process.stderr.write(inspectPrefix(v, colors.orange + "WRN" + colors.reset + Log.getIndent()));
    }
 
    static error(v: any) {
       process.stderr.write(inspectPrefix(v, colors.red + "ERR" + colors.reset + Log.getIndent()));
    }
 }
+
+export const codecName = (encoding: string) => encoding.replace(/([^_]*)_.*/, "$1");

@@ -4,6 +4,7 @@
    "description": "Structured archival of SoundCloud likes and reposts",
    "type": "module",
    "dependencies": {
+      "@ffmpeg-installer/ffmpeg": "^1.1.0",
       "esbuild": "^0.25.10",
       "ink": "^6.3.1",
       "react": "^19.1.1",

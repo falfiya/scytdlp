@@ -2,15 +2,21 @@
 
 🎵 *Structured archival of SoundCloud likes and reposts.*
 
-How many tool files do I need to accomplish something so simple??
+## Archival Structure
 
-- `.editorconfig` to enforce style
-- `.gitignore` so that I don't commit stuff I shouldn't
-- `.python-version` because `uv` makes it
-- `Makefile` as a task-runner
-- `package-lock.json` I guess this one is kind of important
-- `package.json` yeah ok
-- `pyproject.toml` all I wanted was `yt-dlp`
-- `uv.lock` is this the `package-lock.json` equivalent for `uv`?
+```ts
+archive/
+   likes.json
+   reposts.json
 
-In all seriousness, I am grateful to have `uv`. [**I know what the alternative is.**](https://pip.pypa.io/en/stable/)
+   tracks/
+      {track.id}/
+         meta.json
+         track.json
+         {preset}.aac
+   users/
+      {user.id}/
+         meta.json
+         user.json
+         avatar.jpg
+```

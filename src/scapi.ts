@@ -1,6 +1,8 @@
 import fs from "fs";
 
 import * as util from "./util";
+
+import {Log} from "./util";
 import {ConfigFile} from "../config";
 
 export class SoundCloudClient {
@@ -15,19 +17,40 @@ export class SoundCloudClient {
       ["u", `${this.API_BASE}users/`],
    ];
 
-   constructor (
+   constructor(
       public Authorization: string,
       public client_id: string,
       public userID: string,
       public config: ConfigFile,
-   ) {}
+   ) { }
+
+   async m3u8Of(trans: Transcoding): Promise<string> {
+      const res: any = await this.cetch(trans.url, "json");
+      return this.cetch(res.url, "text");
+   }
+
+   static PRESET_RANKING = ["flac", "wav", "aac", "abr", "opus", "mp3"];
+   rankTranscodings(track: Track): Transcoding[] {
+      /**
+       * This is the stream picking logic.
+       */
+      const lt = (a: Transcoding, b: Transcoding) =>
+         (a.quality === "hq" && a.quality !== "hq")
+         || (a.preset === "aac_256k" && b.preset !== "aac_256k")
+         || (SoundCloudClient.PRESET_RANKING.indexOf(util.codecName(a.preset)) < SoundCloudClient.PRESET_RANKING.indexOf(util.codecName(b.preset)))
+         || (!a.is_legacy_transcoding && b.is_legacy_transcoding)
+         || (a.format.protocol === "hls" && b.format.protocol !== "hls");
+      const sortTranscoding = (a: Transcoding, b: Transcoding) => lt(a, b) ? -1 : lt(b, a) ? 1 : 0;
+
+      return track.media.transcodings.sort(sortTranscoding);
+   }
 
    async *trackLikes(limit = 24) {
-      // TODO: Fix caching of first page.
-      let nextHref = `${SoundCloudClient.API_BASE}users/${this.userID}/track_likes?client_id=${this.client_id}&limit=${limit}&offset=0`;
+      const firstRes: TrackLikesResponse = await this.cetch(`${SoundCloudClient.API_BASE}users/${this.userID}/track_likes?client_id=${this.client_id}&limit=${limit}&offset=0`)
+      let nextHref = firstRes.next_href;
       while (true) {
          // @ts-expect-error
-         const res: TrackLikesResponse = await this.fetch(nextHref, "json");
+         const res: TrackLikesResponse = await this.cetch(nextHref, "json");
          yield res;
 
          if (!res.next_href)
@@ -39,18 +62,77 @@ export class SoundCloudClient {
       }
    }
 
-   /**
-    * Fetch with a cache and some deserialization.
-    */
-   async fetch(url: string, expectedFormat: null):                                     Promise<unknown>;
-   async fetch(url: string, expectedFormat: "binary"):                                 Promise<Buffer>;
-   async fetch(url: string, expectedFormat: "text"):                                   Promise<string>;
-   async fetch(url: string, expectedFormat: "json"):                                   Promise<unknown>;
+   /** Fetch with deserialization */
+   async fetch(url: string, expectedFormat?: null): Promise<any>;
+   async fetch(url: string, expectedFormat: "binary"): Promise<Buffer>;
+   async fetch(url: string, expectedFormat: "text"): Promise<string>;
+   async fetch(url: string, expectedFormat: "json"): Promise<unknown>;
    async fetch(url: string, expectedFormat: null | "binary" | "text" | "json" = null): Promise<unknown> {
-      if (!url.startsWith(SoundCloudClient.API_BASE)) {
-         throw new Error("Cannot cetch this url!")
+      Log.debug("Fetching " + url);
+      Log.startGroup();
+      const res = await fetch(url, {headers: {Authorization: this.Authorization}});
+      await util.sleep(this.config.DEBOUNCE_MS);
+
+      const contents = await res.arrayBuffer();
+      const buf = Buffer.from(contents)
+
+      let text: string;
+      try {
+         text = buf.toString("utf8");
+      } catch (e) {
+         switch (expectedFormat) {
+            case null:
+            case "binary":
+               Log.endGroup();
+               return buf;
+            case "text":
+            case "json":
+               Log.endGroup();
+               throw e;
+         }
       }
 
+      let val: any;
+      try {
+         val = JSON.parse(text);
+      } catch (e) {
+         switch (expectedFormat) {
+            case "binary":
+               Log.warn("utf8 recognized! Are you sure you wanted binary?");
+               Log.endGroup();
+               return buf;
+            case null:
+            case "text":
+               Log.endGroup();
+               return text;
+            case "json":
+               Log.endGroup();
+               throw e;
+         }
+      }
+
+      switch (expectedFormat) {
+         case "binary":
+            Log.warn(`json recognized! Are you sure you wanted binary?`);
+            Log.endGroup();
+            return buf;
+         case "text":
+            Log.warn(`json recognized! Are you sure you wanted text?`);
+            Log.endGroup();
+            return text;
+         case null:
+         case "json":
+            Log.endGroup();
+            return val;
+      }
+   }
+
+   /** Fetch with a cache and some deserialization. */
+   async cetch(url: string, expectedFormat?: null): Promise<any>;
+   async cetch(url: string, expectedFormat: "binary"): Promise<Buffer>;
+   async cetch(url: string, expectedFormat: "text"): Promise<string>;
+   async cetch(url: string, expectedFormat: "json"): Promise<unknown>;
+   async cetch(url: string, expectedFormat: null | "binary" | "text" | "json" = null): Promise<unknown> {
       let cacheFile: string | null = null;
       for (const base of SoundCloudClient.KNOWN_URL_BASES) {
          if (url.startsWith(base[1])) {
@@ -58,7 +140,12 @@ export class SoundCloudClient {
          }
       }
       if (cacheFile == null) {
-         cacheFile = "-" +  Buffer.from(url).toString("base64url");
+         cacheFile = "-" + Buffer.from(url).toString("base64url");
+      }
+
+      if (cacheFile.length > 200) {
+         // @ts-ignore
+         return this.fetch(url, expectedFormat);
       }
 
       cached: {
@@ -122,7 +209,7 @@ export class SoundCloudClient {
             if (prevOldCacheFile != null) {
                try {
                   fs.unlinkSync(prevOldCacheFile);
-               } catch (e) {}
+               } catch (e) { }
             }
             prevOldCacheFile = oldCacheFile;
 
@@ -143,12 +230,12 @@ export class SoundCloudClient {
             break cached;
          }
 
-         util.Log.info("Cached " + url);
-         util.Log.startGroup();
+         Log.debug("Cached " + url);
+         Log.startGroup();
 
          if (newestCacheFile !== cacheFile) {
             fs.writeFileSync(cacheFile, buf);
-            util.Log.info("Migrated file!");
+            Log.debug("Migrated file!");
          }
 
          let text: string;
@@ -158,12 +245,12 @@ export class SoundCloudClient {
             switch (expectedFormat) {
                case null:
                case "binary":
-                  util.Log.endGroup();
+                  Log.endGroup();
                   return buf;
                case "text":
                case "json":
-                  util.Log.warn(`Malformed cache. Expected ${expectedFormat}`);
-                  util.Log.endGroup();
+                  Log.warn(`Malformed cache. Expected ${expectedFormat}`);
+                  Log.endGroup();
                   break cached;
             }
          }
@@ -174,41 +261,43 @@ export class SoundCloudClient {
          } catch (e) {
             switch (expectedFormat) {
                case "binary":
-                  util.Log.warn("utf8 recognized! Are you sure you wanted binary?");
-                  util.Log.endGroup();
+                  Log.warn("utf8 recognized! Are you sure you wanted binary?");
+                  Log.endGroup();
                   return buf;
                case null:
                case "text":
-                  util.Log.endGroup();
+                  Log.endGroup();
                   return text;
                case "json":
-                  util.Log.warn(`Malformed cache. Tried to parse JSON:`);
+                  Log.warn(`Malformed cache. Tried to parse JSON:`);
 
-                  util.Log.startGroup();
-                  util.Log.error(e);
-                  util.Log.endGroup();
+                  Log.startGroup();
+                  Log.error(e);
+                  Log.endGroup();
 
-                  util.Log.endGroup();
+                  Log.endGroup();
                   break cached;
             }
          }
 
-         util.Log.endGroup();
          switch (expectedFormat) {
             case "binary":
-               util.Log.warn(`json recognized! Are you sure you wanted binary?`);
+               Log.warn(`json recognized! Are you sure you wanted binary?`);
+               Log.endGroup();
                return buf;
             case "text":
-               util.Log.warn(`json recognized! Are you sure you wanted text?`);
+               Log.warn(`json recognized! Are you sure you wanted text?`);
+               Log.endGroup();
                return text;
             case null:
             case "json":
+               Log.endGroup();
                return val;
          }
       }
 
-      util.Log.info("Fetching " + url);
-      util.Log.startGroup();
+      Log.debug("Fetching " + url);
+      Log.startGroup();
       const res = await fetch(url, {headers: {Authorization: this.Authorization}});
       await util.sleep(this.config.DEBOUNCE_MS);
 
@@ -223,11 +312,11 @@ export class SoundCloudClient {
             case null:
             case "binary":
                fs.writeFileSync(cacheFile, buf);
-               util.Log.endGroup();
+               Log.endGroup();
                return buf;
             case "text":
             case "json":
-               util.Log.endGroup();
+               Log.endGroup();
                throw e;
          }
       }
@@ -239,31 +328,33 @@ export class SoundCloudClient {
          switch (expectedFormat) {
             case "binary":
                fs.writeFileSync(cacheFile, buf);
-               util.Log.warn("utf8 recognized! Are you sure you wanted binary?");
-               util.Log.endGroup();
+               Log.warn("utf8 recognized! Are you sure you wanted binary?");
+               Log.endGroup();
                return buf;
             case null:
             case "text":
                fs.writeFileSync(cacheFile, text);
-               util.Log.endGroup();
+               Log.endGroup();
                return text;
             case "json":
-               util.Log.endGroup();
+               Log.endGroup();
                throw e;
          }
       }
 
-      util.Log.endGroup();
       switch (expectedFormat) {
          case "binary":
-            util.Log.warn(`json recognized! Are you sure you wanted binary?`);
+            Log.warn(`json recognized! Are you sure you wanted binary?`);
+            Log.endGroup();
             return buf;
          case "text":
-            util.Log.warn(`json recognized! Are you sure you wanted text?`);
+            Log.warn(`json recognized! Are you sure you wanted text?`);
+            Log.endGroup();
             return text;
          case null:
          case "json":
             fs.writeFileSync(cacheFile, util.dump(val));
+            Log.endGroup();
             return val;
       }
    }
@@ -285,6 +376,7 @@ type TrackLikeObject = {
 };
 
 type Track = {
+   id: number;
    artwork_url: string;
    caption: string | null;
    commentable: boolean;
@@ -298,6 +390,9 @@ type Track = {
    download_count: number;
    duration: number;
    full_duration: number;
+   media: {
+      transcodings: Transcoding[];
+   };
    // You know, there are many more but I have just realized that I don't care.
    publisher_metadata: Publisher;
    title: string;
@@ -315,6 +410,16 @@ type User = {
     * Username basically.
     */
    permalink: string;
+};
+
+type Transcoding = {
+   url: `${typeof SoundCloudClient.API_BASE}media/soundcloud:${number}/${string}/stream/hls`;
+   preset: string;
+   quality: "hq" | "sq";
+   format: {
+      protocol: string;
+   };
+   is_legacy_transcoding: boolean;
 };
 
 type EpochString = `${number}-${number}-${number}T${number}:${number}:${number}Z`;
