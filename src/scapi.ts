@@ -23,6 +23,7 @@ export class SoundCloudClient {
    ) {}
 
    async *trackLikes(limit = 24) {
+      // TODO: Fix caching of first page.
       let nextHref = `${SoundCloudClient.API_BASE}users/${this.userID}/track_likes?client_id=${this.client_id}&limit=${limit}&offset=0`;
       while (true) {
          // @ts-expect-error
