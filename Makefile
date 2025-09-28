@@ -4,10 +4,13 @@ else
 	PATH := ./node_modules/.bin:$(PATH)
 endif
 
+export NODE_OPTIONS:=--enable-source-maps
+
 dev: build
 	node tmp/js/main
 
 opts += --bundle
+opts += --sourcemap
 opts += --format=esm
 opts += --platform=node
 opts += --packages=external
