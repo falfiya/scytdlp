@@ -59,6 +59,14 @@ export class SoundCloudClient {
       }
    }
 
+   async fetchArtwork(track: Track): Promise<Buffer> {
+      /**
+       * Yes, this is cursed but I'm 90% sure this is how the soundcloud client does it.
+       */
+      const betterUrl = track.artwork_url.replace(/large(?=\.jpg$)/, "t500x500");
+      return this.cetch(betterUrl, "binary");
+   }
+
    /** Fetch with deserialization */
    async fetch(url: string, expectedFormat?: null): Promise<any>;
    async fetch(url: string, expectedFormat: "binary"): Promise<Buffer>;
