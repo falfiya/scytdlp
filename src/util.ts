@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import {inspect} from "util";
 
 import {config} from "./config";
@@ -5,6 +7,22 @@ import {config} from "./config";
 export const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
 export const dump = (a: any) => JSON.stringify(a, null, 3);
 export const debounce = () => sleep(config.debounceMS);
+
+export function mkdir(path: string) {
+   fs.mkdirSync(path, {recursive: true});
+}
+
+export function unlink(path: string) {
+   try {
+      fs.unlinkSync(path);
+   } catch (e) { }
+}
+
+export function write(dest: string, data: Parameters<typeof fs.writeFileSync>[1]) {
+   const dirname = path.dirname(dest);
+   mkdir(dirname);
+   fs.writeFileSync(dest, data);
+}
 
 export const colors = {
    reset: "\x1b[0m",
