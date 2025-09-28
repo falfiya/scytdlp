@@ -1,16 +1,13 @@
-export type ConfigFile = {
-   DEBOUNCE_MS: number;
+export type Config = {
+   debounceMS: number;
+   logLevel?: 0 | 1 | 2;
 };
 
-/**
- * Sorry about the mixed case!
- * These are all used quite differently so I wanted to make that apparent.
- */
-export type SecretsFile = {
-   /** Authorization header */
-   Authorization: `OAuth 2-${string}`;
+export type Secrets = {
+   /** `Authorization` header */
+   authorization: `OAuth 2-${string}`;
    /** Query Parameter */
-   client_id: string;
+   clientID?: string;
    /** For API Path `users/{userID}` */
    userID: string;
 };

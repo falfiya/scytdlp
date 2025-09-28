@@ -1,4 +1,4 @@
 {
-   "DEVELOPMENT": true,
-   "DEBOUNCE_MS": 1111
+   "debounceMS": 2222,
+   "logLevel": 0
 }

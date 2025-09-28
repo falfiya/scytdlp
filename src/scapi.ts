@@ -3,7 +3,7 @@ import fs from "fs";
 import * as util from "./util";
 
 import {Log} from "./util";
-import {ConfigFile} from "../config";
+import {config, secrets} from "./config";
 
 export class SoundCloudClient {
    static API_BASE = "https://api-v2.soundcloud.com/" as const;
@@ -15,14 +15,10 @@ export class SoundCloudClient {
       ["h", "https://"],
       ["0", this.API_BASE],
       ["u", `${this.API_BASE}users/`],
+      ["s", `${this.API_BASE}media/soundcloud:tracks:`],
    ];
 
-   constructor(
-      public Authorization: string,
-      public client_id: string,
-      public userID: string,
-      public config: ConfigFile,
-   ) { }
+   constructor() { }
 
    async m3u8Of(trans: Transcoding): Promise<string> {
       const res: any = await this.cetch(trans.url, "json");
@@ -46,7 +42,8 @@ export class SoundCloudClient {
    }
 
    async *trackLikes(limit = 24) {
-      const firstRes: TrackLikesResponse = await this.cetch(`${SoundCloudClient.API_BASE}users/${this.userID}/track_likes?client_id=${this.client_id}&limit=${limit}&offset=0`)
+      const firstPage = `${SoundCloudClient.API_BASE}users/${secrets.userID}/track_likes?client_id=${secrets.clientID}&limit=${limit}&offset=0`;
+      const firstRes: TrackLikesResponse = await this.cetch(firstPage);
       let nextHref = firstRes.next_href;
       while (true) {
          // @ts-expect-error
@@ -70,8 +67,13 @@ export class SoundCloudClient {
    async fetch(url: string, expectedFormat: null | "binary" | "text" | "json" = null): Promise<unknown> {
       Log.debug("Fetching " + url);
       Log.startGroup();
-      const res = await fetch(url, {headers: {Authorization: this.Authorization}});
-      await util.sleep(this.config.DEBOUNCE_MS);
+      const res = await fetch(url, {headers: {Authorization: secrets.authorization}});
+      if (!res.ok) {
+         throw new Error(`${res.status}: ${res.statusText}`);
+      }
+
+      await util.sleep(config.debounceMS);
+
 
       const contents = await res.arrayBuffer();
       const buf = Buffer.from(contents)
@@ -298,8 +300,8 @@ export class SoundCloudClient {
 
       Log.debug("Fetching " + url);
       Log.startGroup();
-      const res = await fetch(url, {headers: {Authorization: this.Authorization}});
-      await util.sleep(this.config.DEBOUNCE_MS);
+      const res = await fetch(url, {headers: {Authorization: secrets.authorization}});
+      await util.sleep(config.debounceMS);
 
       const contents = await res.arrayBuffer();
       const buf = Buffer.from(contents)
