@@ -100,7 +100,7 @@ export class SoundCloudClient {
       } catch (e) {
          switch (expectedFormat) {
             case "binary":
-               Log.warn("utf8 recognized! Are you sure you wanted binary?");
+               Log.debug("utf8 recognized! Are you sure you wanted binary?");
                Log.endGroup();
                return buf;
             case null:
@@ -115,11 +115,11 @@ export class SoundCloudClient {
 
       switch (expectedFormat) {
          case "binary":
-            Log.warn(`json recognized! Are you sure you wanted binary?`);
+            Log.debug(`json recognized! Are you sure you wanted binary?`);
             Log.endGroup();
             return buf;
          case "text":
-            Log.warn(`json recognized! Are you sure you wanted text?`);
+            Log.debug(`json recognized! Are you sure you wanted text?`);
             Log.endGroup();
             return text;
          case null:
@@ -265,7 +265,7 @@ export class SoundCloudClient {
          } catch (e) {
             switch (expectedFormat) {
                case "binary":
-                  Log.warn("utf8 recognized! Are you sure you wanted binary?");
+                  Log.debug("utf8 recognized! Are you sure you wanted binary?");
                   Log.endGroup();
                   return buf;
                case null:
@@ -286,11 +286,11 @@ export class SoundCloudClient {
 
          switch (expectedFormat) {
             case "binary":
-               Log.warn(`json recognized! Are you sure you wanted binary?`);
+               Log.debug(`json recognized! Are you sure you wanted binary?`);
                Log.endGroup();
                return buf;
             case "text":
-               Log.warn(`json recognized! Are you sure you wanted text?`);
+               Log.debug(`json recognized! Are you sure you wanted text?`);
                Log.endGroup();
                return text;
             case null:
@@ -332,7 +332,7 @@ export class SoundCloudClient {
          switch (expectedFormat) {
             case "binary":
                fs.writeFileSync(cacheFile, buf);
-               Log.warn("utf8 recognized! Are you sure you wanted binary?");
+               Log.debug("utf8 recognized! Are you sure you wanted binary?");
                Log.endGroup();
                return buf;
             case null:
@@ -348,11 +348,11 @@ export class SoundCloudClient {
 
       switch (expectedFormat) {
          case "binary":
-            Log.warn(`json recognized! Are you sure you wanted binary?`);
+            Log.debug(`json recognized! Are you sure you wanted binary?`);
             Log.endGroup();
             return buf;
          case "text":
-            Log.warn(`json recognized! Are you sure you wanted text?`);
+            Log.debug(`json recognized! Are you sure you wanted text?`);
             Log.endGroup();
             return text;
          case null:
