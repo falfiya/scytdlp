@@ -65,6 +65,10 @@ export class SoundCloudClient {
    async fetch(url: string, expectedFormat: "text"): Promise<string>;
    async fetch(url: string, expectedFormat: "json"): Promise<unknown>;
    async fetch(url: string, expectedFormat: null | "binary" | "text" | "json" = null): Promise<unknown> {
+      if (typeof url !== "string") {
+         throw new TypeError(`url must be type string, was instead type ${typeof url}!`);
+      }
+
       Log.debug("Fetching " + url);
       Log.startGroup();
       const res = await fetch(url, {headers: {Authorization: secrets.authorization}});
@@ -135,6 +139,10 @@ export class SoundCloudClient {
    async cetch(url: string, expectedFormat: "text"): Promise<string>;
    async cetch(url: string, expectedFormat: "json"): Promise<unknown>;
    async cetch(url: string, expectedFormat: null | "binary" | "text" | "json" = null): Promise<unknown> {
+      if (typeof url !== "string") {
+         throw new TypeError(`url must be type string, was instead type ${typeof url}!`);
+      }
+
       let cacheFile: string | null = null;
       for (const base of SoundCloudClient.KNOWN_URL_BASES) {
          if (url.startsWith(base[1])) {
