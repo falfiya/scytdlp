@@ -150,6 +150,8 @@ export class SoundCloudClient {
          return this.fetch(url, expectedFormat);
       }
 
+      fs.mkdirSync(SoundCloudClient.FETCH_CACHE, {recursive: true});
+
       cached: {
          let buf: Buffer | null = null;
          // Walk through potential cache files and read the newest one deleting
@@ -414,7 +416,7 @@ type User = {
    permalink: string;
 };
 
-type Transcoding = {
+export type Transcoding = {
    url: `${typeof SoundCloudClient.API_BASE}media/soundcloud:${number}/${string}/stream/hls`;
    preset: string;
    quality: "hq" | "sq";
