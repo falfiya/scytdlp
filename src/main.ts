@@ -1,14 +1,13 @@
 import fs from "fs";
+import {spawn} from "child_process";
 
 import ffmpeg from "@ffmpeg-installer/ffmpeg";
 import wcwidth from "wcwidth";
 
-import {Log, colors} from "./util";
-import {SoundCloudClient} from "./scapi";
-import * as config from "../config";
-import {spawn} from "child_process";
-
 import * as util from "./util";
+import {config} from "./config";
+import {Log, colors} from "./util";
+import {SoundCloudClient, Transcoding} from "./scapi";
 
 
 // If it wasn't clear, I expect working directory to be the repository root
@@ -16,16 +15,8 @@ if (!process.cwd().toLowerCase().endsWith("scarchive")) {
    throw new Error("Checking that I am being run in the repo root!");
 }
 
-// TODO: Some sort of verification for the config files.
-const secretsFile: config.SecretsFile = JSON.parse(fs.readFileSync("config/secrets.json", "utf8"));
-const configFile: config.ConfigFile = JSON.parse(fs.readFileSync("config/config.json", "utf8"));
 
-const client = new SoundCloudClient(
-   secretsFile.Authorization,
-   secretsFile.client_id,
-   secretsFile.userID,
-   configFile,
-);
+const client = new SoundCloudClient();
 
 const trackLikes = [];
 let maxUsername = 0;

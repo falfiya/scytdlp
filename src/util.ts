@@ -1,7 +1,10 @@
 import {inspect} from "util";
 
+import {config} from "./config";
+
 export const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
 export const dump = (a: any) => JSON.stringify(a, null, 3);
+export const debounce = () => sleep(config.debounceMS);
 
 export const colors = {
    reset: "\x1b[0m",
@@ -56,7 +59,9 @@ export class Log {
    }
 
    static debug(v: any) {
-      // process.stderr.write(inspectPrefix(v, colors.grey + "INF" + colors.reset + Log.getIndent()));
+      if ((config.logLevel ?? 0) > 1) {
+         process.stderr.write(inspectPrefix(v, colors.grey + "INF" + colors.reset + Log.getIndent()));
+      }
    }
 
    static info(v: any) {
