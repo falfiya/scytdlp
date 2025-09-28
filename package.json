@@ -1,6 +1,6 @@
 {
    "name": "scarchive",
-   "version": "0.0.3",
+   "version": "0.0.4",
    "description": "Structured archival of SoundCloud likes and reposts",
    "type": "module",
    "dependencies": {
