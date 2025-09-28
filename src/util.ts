@@ -78,7 +78,7 @@ export class Log {
 
    static debug(v: any) {
       if ((config.logLevel ?? 0) > 1) {
-         process.stderr.write(inspectPrefix(v, colors.grey + "INF" + colors.reset + Log.getIndent()));
+         process.stderr.write(inspectPrefix(v, colors.grey + "DBG" + colors.reset + Log.getIndent()));
       }
    }
 
