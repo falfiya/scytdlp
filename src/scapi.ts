@@ -379,7 +379,7 @@ type TrackLikeObject = {
    track: Track;
 };
 
-type Track = {
+export type Track = {
    id: number;
    artwork_url: string;
    caption: string | null;
