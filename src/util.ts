@@ -44,25 +44,25 @@ if (!process.stdout.isTTY) {
    }
 }
 
-/**
- * Horrible utility function.
- *
- * Calls inspect on the object and then prefixes each line with the provided prefix.
- */
-function inspectPrefix(v: any, prefix: string): string {
-   let msg: string;
-   if (typeof v === "string") {
-      msg = v;
-   } else {
-      msg = inspect(v, {colors: process.stdout.isTTY});
-   }
-   return msg.split("\n").map(line => prefix + " " + line).join("\n") + "\n";
-}
-
 export class Log {
    private static indent = 0;
    private static getIndent(): string {
       return " | ".repeat(Log.indent);
+   }
+
+   /**
+    * Horrible utility function.
+    *
+    * Calls inspect on the object and then prefixes each line with the provided prefix.
+    */
+   private static inspectPrefix(v: any, prefix: string): string {
+      let msg: string;
+      if (typeof v === "string") {
+         msg = v;
+      } else {
+         msg = inspect(v, {colors: process.stdout.isTTY});
+      }
+      return msg.split("\n").map(line => prefix + colors.reset + Log.getIndent() + " " + line).join("\n") + "\n";
    }
 
    static startGroup() {
@@ -78,20 +78,20 @@ export class Log {
 
    static debug(v: any) {
       if (config.LOG_LEVEL < 1) {
-         process.stderr.write(inspectPrefix(v, colors.grey + "DBG" + colors.reset + Log.getIndent()));
+         process.stderr.write(Log.inspectPrefix(v, colors.grey + "DBG"));
       }
    }
 
    static info(v: any) {
-      process.stderr.write(inspectPrefix(v, colors.blue + "INF" + colors.reset + Log.getIndent()));
+      process.stderr.write(Log.inspectPrefix(v, colors.blue + "INF"));
    }
 
    static warn(v: any) {
-      process.stderr.write(inspectPrefix(v, colors.orange + "WRN" + colors.reset + Log.getIndent()));
+      process.stderr.write(Log.inspectPrefix(v, colors.orange + "WRN"));
    }
 
    static error(v: any) {
-      process.stderr.write(inspectPrefix(v, colors.red + "ERR" + colors.reset + Log.getIndent()));
+      process.stderr.write(Log.inspectPrefix(v, colors.red + "ERR"));
    }
 }
 

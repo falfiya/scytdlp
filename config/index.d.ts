@@ -1,6 +1,6 @@
 export type Config = {
-   debounceMS: number;
-   logLevel?: 0 | 1 | 2;
+   DEBOUNCE_MS: number;
+   LOG_LEVEL: 0 | 1 | 2;
 };
 
 export type Secrets = {

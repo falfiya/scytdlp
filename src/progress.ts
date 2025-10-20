@@ -1,5 +1,3 @@
-import {Log} from "./util";
-
 /**
  * Progress bar estimation for units.
  * In practice, a unit is a download.
