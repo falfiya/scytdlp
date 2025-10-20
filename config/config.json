@@ -1,4 +1,4 @@
 {
-   "debounceMS": 2222,
-   "logLevel": 0
+   "DEBOUNCE_MS": 2222,
+   "LOG_LEVEL": 1
 }

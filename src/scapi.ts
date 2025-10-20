@@ -319,7 +319,7 @@ export class SoundCloudClient {
       Log.debug("Fetching " + url);
       Log.startGroup();
       const res = await fetch(url, {headers: {Authorization: secrets.authorization}});
-      await util.sleep(config.debounceMS);
+      await util.debounce();
 
       const contents = await res.arrayBuffer();
       const buf = Buffer.from(contents)

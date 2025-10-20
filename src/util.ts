@@ -6,7 +6,7 @@ import {config} from "./config";
 
 export const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
 export const dump = (a: any) => JSON.stringify(a, null, 3);
-export const debounce = () => sleep(config.debounceMS);
+export const debounce = () => sleep(config.DEBOUNCE_MS);
 
 export function mkdir(path: string) {
    fs.mkdirSync(path, {recursive: true});
@@ -77,7 +77,7 @@ export class Log {
    }
 
    static debug(v: any) {
-      if ((config.logLevel ?? 0) > 1) {
+      if (config.LOG_LEVEL < 1) {
          process.stderr.write(inspectPrefix(v, colors.grey + "DBG" + colors.reset + Log.getIndent()));
       }
    }
