@@ -18,7 +18,7 @@ export async function stream(m3u8Path: string, output: string) {
    Log.debug(`ffmpeg stream ${m3u8Path} -> ${tempDownload}`);
    const stderr: string[] = [];
    const ffmpegProcess = child_process.spawn(ffmpeg.path, [
-      "-headers", `Authorization: ${secrets.authorization}`,
+      // Do not add the headers flag. It does not work.
       "-protocol_whitelist", "file,http,https,tcp,tls",
       "-i", m3u8Path,
       "-c:a", "copy",
