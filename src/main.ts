@@ -202,6 +202,7 @@ for (const playlist of Object.values(playlistsToProcess)) {
 Log.groupEnd();
 
 Log.info("Streaming Tracks");
+const trackFailures: sc.Track[] = [];
 Log.groupStart();
 const tracksToProcess2 = Object.values(tracksToProcess);
 const progress = new Progress(tracksToProcess2.length);
@@ -215,6 +216,16 @@ for (const track of tracksToProcess2) {
    } else {
       // not an accurate estimate of how long it will take
       progress.bump();
+   }
+}
+
+if (trackFailures.length === 0) {
+   Log.info("Done!");
+} else {
+   Log.info("Failed to download the following tracks:");
+   Log.groupStart();
+   for (const track of trackFailures) {
+      Log.info(`${colors.blue}${track.user.permalink.padStart(maxUsernameTracks)} - ${colors.cyan}${track.title}`)
    }
 }
 Log.groupEnd();
@@ -242,6 +253,7 @@ async function downloadTrack(track: sc.Track): Promise<"downloaded" | "cached" |
    }
 
    if (!success) {
+      trackFailures.push(track);
       Log.error("Failed to download track!");
    }
 
