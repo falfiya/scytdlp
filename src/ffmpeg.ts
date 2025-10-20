@@ -6,6 +6,7 @@ import ffmpeg from "@ffmpeg-installer/ffmpeg";
 
 import {Log} from "./util";
 import * as util from "./util";
+import {secrets} from "./config";
 
 export async function stream(m3u8Path: string, output: string) {
    util.mkdir("tmp/download");
@@ -17,6 +18,7 @@ export async function stream(m3u8Path: string, output: string) {
    Log.debug(`ffmpeg stream ${m3u8Path} -> ${tempDownload}`);
    const stderr: string[] = [];
    const ffmpegProcess = child_process.spawn(ffmpeg.path, [
+      "-headers", `Authorization: ${secrets.authorization}`,
       "-protocol_whitelist", "file,http,https,tcp,tls",
       "-i", m3u8Path,
       "-c:a", "copy",
