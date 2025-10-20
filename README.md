@@ -1,5 +1,7 @@
 # SCARchive
 
+![](./misc/icon.png)
+
 🎵 *Structured archival of SoundCloud likes and reposts.*
 
 ## Archival Structure
