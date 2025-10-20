@@ -1,4 +1,5 @@
 export type Config = {
+   OUTPUT: string;
    DEBOUNCE_MS: number;
    LOG_LEVEL: 0 | 1 | 2;
 };

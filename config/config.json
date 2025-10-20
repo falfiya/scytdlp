@@ -1,4 +1,5 @@
 {
+   "OUTPUT": "../SCARchive-data",
    "DEBOUNCE_MS": 2222,
    "LOG_LEVEL": 1
 }
