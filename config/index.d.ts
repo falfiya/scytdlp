@@ -2,6 +2,7 @@ export type Config = {
    OUTPUT: string;
    DEBOUNCE_MS: number;
    LOG_LEVEL: 0 | 1 | 2;
+   USE_ARCHIVED_AS_CACHE: boolean;
 };
 
 export type Secrets = {

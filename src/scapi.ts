@@ -3,7 +3,7 @@ import fs from "fs";
 import * as util from "./util";
 
 import {Log} from "./util";
-import {secrets} from "./config";
+import {config, secrets} from "./config";
 
 export class SoundCloudClient {
    static API_BASE = "https://api-v2.soundcloud.com/" as const;
@@ -82,11 +82,23 @@ export class SoundCloudClient {
    }
 
    async fetchPlaylist(playlistId: number | string): Promise<Playlist> {
+      if (config.USE_ARCHIVED_AS_CACHE) {
+         try {
+            const archivedPlaylistFile = fs.readFileSync(`${config.OUTPUT}/playlists/${playlistId}/playlist.json`, "utf8");
+            return JSON.parse(archivedPlaylistFile);
+         } catch (e) {}
+      }
       return this.cetch(`${SoundCloudClient.API_BASE}playlists/${playlistId}?client_id=${secrets.clientID}`);
    }
 
+   // this may seem inefficient and it is for the first time, but the fact is that this gets cached at multiple levels.
    async fetchTrack(id: number): Promise<Track> {
-      // this may seem inefficient and it is for the first time, but the fact is that this gets cached!
+      if (config.USE_ARCHIVED_AS_CACHE) {
+         try {
+            const archivedTrackFile = fs.readFileSync(`${config.OUTPUT}/tracks/${id}/track.json`, "utf8");
+            return JSON.parse(archivedTrackFile);
+         } catch (e) {}
+      }
       const res: Track[] = await this.cetch(`${SoundCloudClient.API_BASE}tracks?ids=${id}&client_id=${secrets.clientID}`);
       if (res.length === 0) {
          throw new Error(`Could not find track#${id}`);
@@ -119,6 +131,7 @@ export class SoundCloudClient {
       Log.groupStart();
       const res = await fetch(url, {headers: {Authorization: secrets.authorization}});
       if (!res.ok) {
+         Log.groupEnd();
          throw new Error(`${res.status}: ${res.statusText}`);
       }
 

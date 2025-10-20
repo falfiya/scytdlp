@@ -1,5 +1,6 @@
 {
    "OUTPUT": "../SCARchive-data",
    "DEBOUNCE_MS": 2222,
-   "LOG_LEVEL": 1
+   "LOG_LEVEL": 1,
+   "USE_ARCHIVED_AS_CACHE": true
 }
