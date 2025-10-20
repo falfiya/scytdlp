@@ -29,9 +29,9 @@ export async function stream(m3u8Path: string, output: string) {
          if (code === 0) {
             res(0);
          } else {
-            Log.startGroup();
+            Log.groupStart();
             Log.error(stderr.join(""));
-            Log.endGroup();
+            Log.groupEnd();
             rej(`Process exited with code ${code}`);
          }
       })

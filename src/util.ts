@@ -65,11 +65,11 @@ export class Log {
       return msg.split("\n").map(line => prefix + colors.reset + Log.getIndent() + " " + line).join("\n") + "\n";
    }
 
-   static startGroup() {
+   static groupStart() {
       Log.indent++;
    }
 
-   static endGroup() {
+   static groupEnd() {
       Log.indent--;
       if (Log.indent < 0) {
          Log.indent = 0;

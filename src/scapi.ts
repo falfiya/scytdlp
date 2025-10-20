@@ -3,7 +3,7 @@ import fs from "fs";
 import * as util from "./util";
 
 import {Log} from "./util";
-import {config, secrets} from "./config";
+import {secrets} from "./config";
 
 export class SoundCloudClient {
    static API_BASE = "https://api-v2.soundcloud.com/" as const;
@@ -16,6 +16,7 @@ export class SoundCloudClient {
       ["0", this.API_BASE],
       ["u", `${this.API_BASE}users/`],
       ["s", `${this.API_BASE}media/soundcloud:tracks:`],
+      ["p", `${this.API_BASE}playlists/`],
    ];
 
    constructor() { }
@@ -27,6 +28,9 @@ export class SoundCloudClient {
 
    static PRESET_RANKING = ["flac", "wav", "aac", "abr", "opus", "mp3"];
    rankTranscodings(track: Track): Transcoding[] {
+      if (track.media == null) return [];
+      if (track.media.transcodings == null) return [];
+      if (track.media.transcodings.length < 2) return track.media.transcodings;
       /**
        * This is the stream picking logic.
        */
@@ -41,13 +45,9 @@ export class SoundCloudClient {
       return track.media.transcodings.sort(sortTranscoding);
    }
 
-   async *trackLikes(limit = 24) {
-      const firstPage = `${SoundCloudClient.API_BASE}users/${secrets.userID}/track_likes?client_id=${secrets.clientID}&limit=${limit}&offset=0`;
-      const firstRes: TrackLikesResponse = await this.cetch(firstPage);
-      let nextHref = firstRes.next_href;
-      while (true) {
-         // @ts-expect-error
-         const res: TrackLikesResponse = await this.cetch(nextHref, "json");
+   async *fetcher<T>(nextHref: string): AsyncGenerator<T, void, unknown> {
+      while (nextHref) {
+         const res = await this.cetch(nextHref);
          yield res;
 
          if (!res.next_href)
@@ -59,11 +59,49 @@ export class SoundCloudClient {
       }
    }
 
-   async fetchArtwork(track: Track): Promise<Buffer> {
+   async *fetchTrackLikes(limit = 24) {
+      const endpoint = `${SoundCloudClient.API_BASE}users/${secrets.userID}/track_likes?client_id=${secrets.clientID}&limit=${limit}&offset=0`;
+      for await (const res of this.fetcher<TrackLikesResponse>(endpoint)) {
+         yield res.collection;
+      }
+   }
+
+   async *fetchPlaylistLikes(limit = 12) {
+      const now = new Date();
+      const endpoint = `${SoundCloudClient.API_BASE}me/library/all?offset=${now.toISOString()},playlists,${68716460 * Math.random() | 0}&limit=${limit}&client_id=${secrets.clientID}`
+      for await (const res of this.fetcher<PlaylistLikesResponse>(endpoint)) {
+         yield res.collection;
+      }
+   }
+
+   async *fetchReposts() {
+      const endpoint = `${SoundCloudClient.API_BASE}profile/soundcloud:users:${secrets.userID}`;
+      for await (const res of this.fetcher<RepostRespones>(endpoint)) {
+         yield res.collection;
+      }
+   }
+
+   async fetchPlaylist(playlistId: number | string): Promise<Playlist> {
+      return this.cetch(`${SoundCloudClient.API_BASE}playlists/${playlistId}?client_id=${secrets.clientID}`);
+   }
+
+   async fetchTrack(id: number): Promise<Track> {
+      // this may seem inefficient and it is for the first time, but the fact is that this gets cached!
+      const res: Track[] = await this.cetch(`${SoundCloudClient.API_BASE}tracks?ids=${id}&client_id=${secrets.clientID}`);
+      if (res.length === 0) {
+         throw new Error(`Could not find track#${id}`);
+      }
+      if (res.length > 1) {
+         Log.warn(`${res.length} values returned from fetchTrack!`);
+      }
+      return res[0]!;
+   }
+
+   async fetchArtwork(artworkUrl: string): Promise<Buffer> {
       /**
        * Yes, this is cursed but I'm 90% sure this is how the soundcloud client does it.
        */
-      const betterUrl = track.artwork_url.replace(/large(?=\.jpg$)/, "t500x500");
+      const betterUrl = artworkUrl.replace(/large(?=\.jpg$)/, "t500x500");
       return this.cetch(betterUrl, "binary");
    }
 
@@ -78,14 +116,13 @@ export class SoundCloudClient {
       }
 
       Log.debug("Fetching " + url);
-      Log.startGroup();
+      Log.groupStart();
       const res = await fetch(url, {headers: {Authorization: secrets.authorization}});
       if (!res.ok) {
          throw new Error(`${res.status}: ${res.statusText}`);
       }
 
-      await util.sleep(config.debounceMS);
-
+      await util.debounce();
 
       const contents = await res.arrayBuffer();
       const buf = Buffer.from(contents)
@@ -97,11 +134,11 @@ export class SoundCloudClient {
          switch (expectedFormat) {
             case null:
             case "binary":
-               Log.endGroup();
+               Log.groupEnd();
                return buf;
             case "text":
             case "json":
-               Log.endGroup();
+               Log.groupEnd();
                throw e;
          }
       }
@@ -113,14 +150,14 @@ export class SoundCloudClient {
          switch (expectedFormat) {
             case "binary":
                Log.debug("utf8 recognized! Are you sure you wanted binary?");
-               Log.endGroup();
+               Log.groupEnd();
                return buf;
             case null:
             case "text":
-               Log.endGroup();
+               Log.groupEnd();
                return text;
             case "json":
-               Log.endGroup();
+               Log.groupEnd();
                throw e;
          }
       }
@@ -128,15 +165,15 @@ export class SoundCloudClient {
       switch (expectedFormat) {
          case "binary":
             Log.debug(`json recognized! Are you sure you wanted binary?`);
-            Log.endGroup();
+            Log.groupEnd();
             return buf;
          case "text":
             Log.debug(`json recognized! Are you sure you wanted text?`);
-            Log.endGroup();
+            Log.groupEnd();
             return text;
          case null:
          case "json":
-            Log.endGroup();
+            Log.groupEnd();
             return val;
       }
    }
@@ -158,7 +195,7 @@ export class SoundCloudClient {
          }
       }
       if (cacheFile == null) {
-         cacheFile = "-" + Buffer.from(url).toString("base64url");
+         cacheFile = SoundCloudClient.FETCH_CACHE + "/" + "-" + Buffer.from(url).toString("base64url");
       }
 
       if (cacheFile.length > 200) {
@@ -216,9 +253,10 @@ export class SoundCloudClient {
              * You close your eyes and a single tear rolls down your cheek, hesitating on your chin-
              * before falling unceremoniously to the ground.
              *
-             * A geyser was born from the holy matrimony of the power granted to You by Klipp Borde,
-             * erupting in a magnificant fashion. One cult member is not so lucky, standing right
-             * above it, and is immediately disolved into the spring.
+             * The ground splits open and a geyser is born from the power granted to You by Klipp Borde.
+             * One cult member is not so lucky, standing right above it.
+             * The eruption is instant and mercilessless. It tears through him, rending flesh from cargo pants.
+             * He is immediately disolved into the spring.
              *
              * Thank you, Klipp Borde! And let your powers reign forevermore!
              */
@@ -251,10 +289,10 @@ export class SoundCloudClient {
          }
 
          Log.debug("Cached " + url);
-         Log.startGroup();
+         Log.groupStart();
 
          if (newestCacheFile !== cacheFile) {
-            fs.writeFileSync(cacheFile, buf);
+            util.write(cacheFile, buf);
             Log.debug("Migrated file!");
          }
 
@@ -265,12 +303,12 @@ export class SoundCloudClient {
             switch (expectedFormat) {
                case null:
                case "binary":
-                  Log.endGroup();
+                  Log.groupEnd();
                   return buf;
                case "text":
                case "json":
                   Log.warn(`Malformed cache. Expected ${expectedFormat}`);
-                  Log.endGroup();
+                  Log.groupEnd();
                   break cached;
             }
          }
@@ -282,20 +320,20 @@ export class SoundCloudClient {
             switch (expectedFormat) {
                case "binary":
                   Log.debug("utf8 recognized! Are you sure you wanted binary?");
-                  Log.endGroup();
+                  Log.groupEnd();
                   return buf;
                case null:
                case "text":
-                  Log.endGroup();
+                  Log.groupEnd();
                   return text;
                case "json":
                   Log.warn(`Malformed cache. Tried to parse JSON:`);
 
-                  Log.startGroup();
+                  Log.groupStart();
                   Log.error(e);
-                  Log.endGroup();
+                  Log.groupEnd();
 
-                  Log.endGroup();
+                  Log.groupEnd();
                   break cached;
             }
          }
@@ -303,21 +341,21 @@ export class SoundCloudClient {
          switch (expectedFormat) {
             case "binary":
                Log.debug(`json recognized! Are you sure you wanted binary?`);
-               Log.endGroup();
+               Log.groupEnd();
                return buf;
             case "text":
                Log.debug(`json recognized! Are you sure you wanted text?`);
-               Log.endGroup();
+               Log.groupEnd();
                return text;
             case null:
             case "json":
-               Log.endGroup();
+               Log.groupEnd();
                return val;
          }
       }
 
       Log.debug("Fetching " + url);
-      Log.startGroup();
+      Log.groupStart();
       const res = await fetch(url, {headers: {Authorization: secrets.authorization}});
       await util.debounce();
 
@@ -331,12 +369,12 @@ export class SoundCloudClient {
          switch (expectedFormat) {
             case null:
             case "binary":
-               fs.writeFileSync(cacheFile, buf);
-               Log.endGroup();
+               util.write(cacheFile, buf);
+               Log.groupEnd();
                return buf;
             case "text":
             case "json":
-               Log.endGroup();
+               Log.groupEnd();
                throw e;
          }
       }
@@ -347,17 +385,17 @@ export class SoundCloudClient {
       } catch (e) {
          switch (expectedFormat) {
             case "binary":
-               fs.writeFileSync(cacheFile, buf);
+               util.write(cacheFile, buf);
                Log.debug("utf8 recognized! Are you sure you wanted binary?");
-               Log.endGroup();
+               Log.groupEnd();
                return buf;
             case null:
             case "text":
-               fs.writeFileSync(cacheFile, text);
-               Log.endGroup();
+               util.write(cacheFile, text);
+               Log.groupEnd();
                return text;
             case "json":
-               Log.endGroup();
+               Log.groupEnd();
                throw e;
          }
       }
@@ -365,16 +403,16 @@ export class SoundCloudClient {
       switch (expectedFormat) {
          case "binary":
             Log.debug(`json recognized! Are you sure you wanted binary?`);
-            Log.endGroup();
+            Log.groupEnd();
             return buf;
          case "text":
             Log.debug(`json recognized! Are you sure you wanted text?`);
-            Log.endGroup();
+            Log.groupEnd();
             return text;
          case null:
          case "json":
-            fs.writeFileSync(cacheFile, util.dump(val));
-            Log.endGroup();
+            util.write(cacheFile, util.dump(val));
+            Log.groupEnd();
             return val;
       }
    }
@@ -382,16 +420,16 @@ export class SoundCloudClient {
 
 type TrackLikesResponse = {
    collection: TrackLikeObject[];
-   next_href: `${typeof SoundCloudClient.API_BASE}users/${number}/track_likes?offset=${string}&limit=${number}`;
+   next_href?: `${typeof SoundCloudClient.API_BASE}users/${number}/track_likes?offset=${string}&limit=${number}`;
    query_urn: unknown;
 };
 
-type TrackLikeObject = {
+export type TrackLikeObject = {
    /**
     * If fetched through trackLikes, this is when you liked the track!
     */
    created_at: EpochString;
-   kind: "like" | string,
+   kind: "like" | string;
    track: Track;
 };
 
@@ -443,3 +481,74 @@ export type Transcoding = {
 };
 
 type EpochString = `${number}-${number}-${number}T${number}:${number}:${number}Z`;
+
+export type PlaylistLikesResponse = {
+   collection: (PlaylistLikeObject | PlaylistCreateObject | SystemPlaylistLikeObject)[],
+   next_href?: `${typeof SoundCloudClient.API_BASE}me/library/all?offset=`;
+}
+
+export type SystemPlaylistLikeObject = {
+   created_at: string;
+   type: "system-playlist-like";
+   /** Your user */
+   user: User;
+   system_playlist: Playlist;
+};
+
+export type PlaylistCreateObject = {
+   created_at: string;
+   type: "playlist";
+   /** Your user */
+   user: User;
+   playlist: PlaylistNoTracks;
+}
+
+export type PlaylistLikeObject = {
+   created_at: string;
+   type: `playlist-like`;
+   user: User;
+   playlist: PlaylistNoTracks;
+};
+
+export type PlaylistNoTracks = {
+   id: number | string;
+   artwork_url: string;
+   user: User;
+   title: string;
+};
+
+export type Playlist = {
+   artwork_url: string;
+   id: number | string;
+   user: User;
+   title: string;
+   tracks: {id: number}[];
+};
+
+export type RepostRespones ={
+   collection: Repost[];
+   next_href: string;
+};
+
+export type Repost = TrackRepost | PlaylistRepost | PlaylistCreateObject | TrackCreateObject;
+
+export type TrackRepost = {
+   created_at: string;
+   type: "track-repost";
+   user: User;
+   track: Track;
+}
+
+export type PlaylistRepost = {
+   created_at: string;
+   type: `playlist-repost`;
+   user: User;
+   playlist: PlaylistNoTracks;
+};
+
+export type TrackCreateObject = {
+   created_at: string;
+   type: "track";
+   user: User;
+   track: Track;
+}

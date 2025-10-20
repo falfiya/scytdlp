@@ -5,7 +5,8 @@ import * as ffmpeg from "./ffmpeg";
 
 import {Progress} from "./progress";
 import {Log, colors} from "./util";
-import {SoundCloudClient, Track, Transcoding} from "./scapi";
+import * as sc from "./scapi";
+import {config} from "./config";
 
 
 // If it wasn't clear, I expect working directory to be the repository root
@@ -13,52 +14,218 @@ if (!process.cwd().toLowerCase().endsWith("scarchive")) {
    throw new Error("Checking that I am being run in the repo root!");
 }
 
-const client = new SoundCloudClient();
+const client = new sc.SoundCloudClient();
+const tracksToProcess: {[id in string]: sc.Track} = {};
+const playlistsToProcess: {[id in string]: sc.Playlist} = {};
 
-const trackLikes = [];
-let maxUsername = 0;
-
-for await (const trackLikesResponse of client.trackLikes()) {
-   for (const trackLike of trackLikesResponse.collection) {
-      trackLikes.push(trackLike);
-      const usernameLength = trackLike.track.user.permalink.length;
-      if (usernameLength > maxUsername) {
-         maxUsername = usernameLength;
+Log.info("Track Likes");
+let maxUsernameTracks = 0;
+Log.groupStart();
+{
+   const likes: sc.TrackLikeObject[] = [];
+   for await (const _likes of client.fetchTrackLikes()) {
+      for (const like of _likes) {
+         likes.push(like);
+         const usernameLength = like.track.user.permalink.length;
+         if (usernameLength > maxUsernameTracks) {
+            maxUsernameTracks = usernameLength;
+         }
       }
    }
+   likes.sort((a, b) => new Date(a.created_at) < new Date(b.created_at) ? -1 : 1);
+   for (const like of likes) {
+      const {track} = like;
+      Log.info(`${colors.yellow}${like.created_at} ${colors.blue}${track.user.permalink.padStart(maxUsernameTracks)} - ${colors.cyan}${track.title}`);
+      if (!tracksToProcess[track.id]) {
+         tracksToProcess[track.id] = track;
+      }
+   }
+
+   util.write(`${config.OUTPUT}/likes.json`, util.dump(likes));
 }
+Log.groupEnd();
 
-trackLikes.sort((a, b) => new Date(a.created_at) < new Date(b.created_at) ? -1 : 1);
+Log.info("Playlist Likes");
+Log.groupStart();
+let maxPlaylistUsername = 0;
+{
+   const likes = [];
+   for await (const _likes of client.fetchPlaylistLikes()) {
+      for (const like of _likes) {
+         likes.push(like);
+         let usernameLength;
+         if (like.type === "system-playlist-like") {
+            usernameLength = like.system_playlist.user.permalink.length;
+         } else if (like.type.startsWith("playlist") ) {
+            usernameLength = like.playlist.user.permalink.length;
+         } else {
+            Log.error("Unrecognized Playlist Like Type!");
+            Log.error(like);
+            continue;
+         }
+         if (usernameLength > maxPlaylistUsername) {
+            maxPlaylistUsername = usernameLength;
+         }
+      }
+   }
 
-const progress = new Progress(trackLikes.length);
-for (const trackLike of trackLikes) {
-   const {track} = trackLike;
+   likes.sort((a, b) => new Date(a.created_at) < new Date(b.created_at) ? -1 : 1);
+   for (const like of likes) {
+      let playlist: sc.PlaylistNoTracks;
+      if (like.type === "system-playlist-like") {
+         playlist = like.system_playlist;
+      } else {
+         playlist = like.playlist;
+      }
+      Log.info(`${colors.yellow}${like.created_at} ${colors.blue}${playlist.user.permalink.padStart(maxPlaylistUsername)} - ${colors.cyan}${playlist.title}`);
+      const fullPlaylist = await client.fetchPlaylist(playlist.id);
+      if (fullPlaylist != null && typeof fullPlaylist === "object") {
+         if (!playlistsToProcess[playlist.id]) {
+            playlistsToProcess[playlist.id] = fullPlaylist;
+         }
+      } else {
+         Log.error(`Error fetching playlist ${playlist.title}#${playlist.id}!`);
+         Log.error(fullPlaylist);
+         if (!playlistsToProcess[playlist.id]) {
+            // @ts-shut-the-fuck-up
+            playlistsToProcess[playlist.id] = playlist;
+         }
+      }
+   }
+   util.write("archive/playlist.json", util.dump(likes));
+}
+Log.groupEnd();
 
-   Log.info(`${colors.yellow}${trackLike.created_at} ${colors.blue}${track.user.permalink.padStart(maxUsername)} - ${colors.cyan}${track.title}`);
-   Log.startGroup();
+Log.info("Reposts");
+let maxRepostUsername = 0;
+Log.groupStart();
+{
+   const reposts: sc.Repost[] = [];
+   for await (const _reposts of client.fetchReposts()) {
+      for (const repost of _reposts) {
+         let obj;
+         switch (repost.type) {
+         case "track":
+         case "track-repost":
+            obj = repost.track;
+            break;
+         case "playlist":
+         case "playlist-repost":
+            obj = repost.playlist;
+         default:
+            // This should be impossible because of a branch above.
+            Log.error("Unrecognized Repost Type!");
+            Log.error(repost);
+            continue;
+         }
+         reposts.push(repost);
+         const usernameLength = obj.user.permalink.length;
+         if (usernameLength > maxRepostUsername) {
+            maxRepostUsername = usernameLength;
+         }
+      }
+   }
 
+   reposts.sort((a, b) => new Date(a.created_at) < new Date(b.created_at) ? -1 : 1);
+   util.write("archive/reposts.json", util.dump(reposts));
+
+   for (const repost of reposts) {
+      let obj;
+      switch (repost.type) {
+      case "track":
+      case "track-repost":
+         obj = repost.track;
+         break;
+      case "playlist":
+      case "playlist-repost":
+         obj = repost.playlist;
+      default:
+         // This should be impossible because of a branch above.
+         Log.error("Unrecognized Repost Type!");
+         Log.error(repost);
+         continue;
+      }
+      Log.info(`${colors.yellow}${repost.created_at} ${colors.blue}${obj.user.permalink.padStart(maxRepostUsername)} - ${colors.cyan}${obj.title}`);
+   }
+}
+Log.groupEnd();
+
+Log.info("Processing Playlists");
+Log.groupStart();
+for (const playlist of Object.values(playlistsToProcess)) {
+   Log.debug(typeof playlist);
+   Log.info(`${colors.blue}${playlist.user.permalink.padEnd(maxPlaylistUsername)} - ${colors.cyan}${playlist.title}`);
+   Log.groupStart();
+   for (const partial of playlist.tracks) {
+      try {
+         const track = await client.fetchTrack(partial.id);
+         const usernameLength = track.user.permalink.length;
+         if (usernameLength > maxUsernameTracks) {
+            maxUsernameTracks = usernameLength;
+         }
+         tracksToProcess[track.id] = track;
+      } catch (e) {
+         Log.error(e);
+      }
+   }
+
+   let outdir: string;
+   if (typeof playlist.id === "string" && playlist.id.startsWith("soundcloud:system-playlists:")) {
+      outdir = `archive/playlists/${playlist.title.replace(/\s/g, "_")}`;
+   } else {
+      outdir = `archive/playlists/${playlist.id}`;
+   }
+
+   fs.mkdirSync(outdir, {recursive: true});
+   if (playlist.artwork_url) {
+      await downloadArt(playlist.artwork_url, `${outdir}/artwork.jpg`);
+   }
+   util.write(`${outdir}/playlist.json`, util.dump(playlist));
+   Log.groupEnd();
+}
+Log.groupEnd();
+
+Log.info("Streaming Tracks");
+Log.groupStart();
+const tracksToProcess2 = Object.values(tracksToProcess);
+const progress = new Progress(tracksToProcess2.length);
+for (const track of tracksToProcess2) {
+   const startProgress = progress.startProfile();
+
+   const whatHappened = await downloadTrack(track);
+   if (whatHappened === "downloaded") {
+      progress.endProfile(startProgress);
+      Log.info(`Time remaining: ${progress}`);
+   } else {
+      // not an accurate estimate of how long it will take
+      progress.bump();
+   }
+}
+Log.groupEnd();
+
+async function downloadTrack(track: sc.Track): Promise<"downloaded" | "cached" | "failure"> {
    const outdir = `archive/tracks/${track.id}`;
    fs.mkdirSync(outdir, {recursive: true});
 
-   const startProgress = progress.startProfile();
+   Log.info(`${colors.blue}${track.user.permalink.padEnd(maxUsernameTracks)} - ${colors.cyan}${track.title}`)
+   Log.groupStart();
 
-   let networkActivity = false;
-   let downloadSuccessful = false;
+   let cached;
+   let success = false;
    for (const trans of client.rankTranscodings(track)) {
       try {
-         const cached = await downloadTranscoding(trans, track);
-         networkActivity = !cached;
-         downloadSuccessful = true;
+         cached = await downloadTranscoding(trans, track);
+         success = true;
          break;
       } catch (e) {
          Log.warn(`Failed:`);
-         Log.startGroup();
+         Log.groupStart();
          Log.error(e);
-         Log.endGroup();
+         Log.groupEnd();
       }
    }
 
-   if (!downloadSuccessful) {
+   if (!success) {
       Log.error("Failed to download track!");
    }
 
@@ -67,39 +234,27 @@ for (const trackLike of trackLikes) {
       util.write(outmeta, util.dump(track));
    }
 
-   const outart = `${outdir}/artwork.jpg`;
-   if (!fs.existsSync(outart)){
-      Log.info("Fetching album art");
-      Log.startGroup();
-      try {
-         util.write(outart, await client.fetchArtwork(track));
-         if (!networkActivity) {
-            // We perform debouncing in the download path, but if we cached the
-            // file, then it's a good idea to wait.
-            await util.debounce();
-         }
-         networkActivity = true;
-      } catch (e) {
-         Log.error(e);
+   if (track.artwork_url) {
+      await downloadArt(track.artwork_url, `${outdir}/artwork.jpg`);
+   }
+   Log.groupEnd();
+
+   if (success) {
+      if (cached) {
+         return "cached"
+      } else {
+         return "downloaded";
       }
-      Log.endGroup();
    }
 
-   if (networkActivity) {
-      progress.endProfile(startProgress);
-      Log.info(`Time remaining: ${progress}`);
-   } else {
-      // not an accurate estimate of how long it will take
-      progress.bump();
-   }
-   Log.endGroup();
+   return "failure";
 }
 
 /**
  * @returns true if the file was cached.
  * @throws If there was an error downloading that transcoding
  */
-async function downloadTranscoding(trans: Transcoding, track: Track): Promise<boolean> {
+async function downloadTranscoding(trans: sc.Transcoding, track: sc.Track): Promise<boolean> {
    if (trans.preset === "aac_256k") {
       Log.info(`${colors.purple}G${colors.magenta}o${colors.orange}+${colors.reset} Activated!`);
    }
@@ -108,7 +263,7 @@ async function downloadTranscoding(trans: Transcoding, track: Track): Promise<bo
    const outfile = `archive/tracks/${track.id}/${trans.preset}.${ext}`;
 
    if (fs.existsSync(outfile)) {
-      Log.info(`${colors.grey}Cached at ${colors.reset}${outfile}`);
+      Log.info(`${colors.grey}Already present at ${outfile}${colors.reset}`);
       return true;
    }
 
@@ -122,4 +277,17 @@ async function downloadTranscoding(trans: Transcoding, track: Track): Promise<bo
 
    Log.info(`Done.`);
    return false;
+}
+
+async function downloadArt(artworkUrl: string, outart: string): Promise<void> {
+   if (!fs.existsSync(outart)){
+      Log.info("Fetching album art");
+      Log.groupStart();
+      try {
+         util.write(outart, await client.fetchArtwork(artworkUrl));
+      } catch (e) {
+         Log.error(e);
+      }
+      Log.groupEnd();
+   }
 }
