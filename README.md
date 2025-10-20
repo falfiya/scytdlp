@@ -30,3 +30,8 @@ tmp/
    download/                                 ffmpeg streams to this directory
    js/                                       JavaScript output files
 ```
+
+## Debugging
+
+If the downloader is having a hard time streaming audio or you keep running into `403: Unauthorized`,
+run: `make cache~clear_m3u8`.
