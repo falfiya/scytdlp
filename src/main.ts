@@ -78,21 +78,35 @@ let maxPlaylistUsername = 0;
          playlist = like.playlist;
       }
       Log.info(`${colors.yellow}${like.created_at} ${colors.blue}${playlist.user.permalink.padStart(maxPlaylistUsername)} - ${colors.cyan}${playlist.title}`);
-      const fullPlaylist = await client.fetchPlaylist(playlist.id);
-      if (fullPlaylist != null && typeof fullPlaylist === "object") {
-         if (!playlistsToProcess[playlist.id]) {
-            playlistsToProcess[playlist.id] = fullPlaylist;
-         }
-      } else {
-         Log.error(`Error fetching playlist ${playlist.title}#${playlist.id}!`);
-         Log.error(fullPlaylist);
+
+      if (typeof playlist.id === "string" && playlist.id.startsWith("soundcloud")) {
+         // Special system playlist case. We don't need to re-fetch it.
          if (!playlistsToProcess[playlist.id]) {
             // @ts-shut-the-fuck-up
             playlistsToProcess[playlist.id] = playlist;
          }
+         continue;
+      }
+
+      const fullPlaylist = await client.fetchPlaylist(playlist.id);
+      if (fullPlaylist == null || typeof fullPlaylist !== "object") {
+         Log.warn(`Error fetching playlist ${playlist.title}#${playlist.id}!`);
+         Log.warn("Using what I had initially:")
+         Log.groupStart();
+         Log.warn(playlist);
+         Log.groupEnd();
+         if (!playlistsToProcess[playlist.id]) {
+            // @ts-ignore
+            playlistsToProcess[playlist.id] = playlist;
+         }
+         continue;
+      }
+
+      if (!playlistsToProcess[fullPlaylist.id]) {
+         playlistsToProcess[fullPlaylist.id] = fullPlaylist;
       }
    }
-   util.write("archive/playlist.json", util.dump(likes));
+   util.write(`${config.OUTPUT}/playlist.json`, util.dump(likes));
 }
 Log.groupEnd();
 
@@ -112,6 +126,7 @@ Log.groupStart();
          case "playlist":
          case "playlist-repost":
             obj = repost.playlist;
+            break;
          default:
             // This should be impossible because of a branch above.
             Log.error("Unrecognized Repost Type!");
@@ -127,7 +142,7 @@ Log.groupStart();
    }
 
    reposts.sort((a, b) => new Date(a.created_at) < new Date(b.created_at) ? -1 : 1);
-   util.write("archive/reposts.json", util.dump(reposts));
+   util.write(`${config.OUTPUT}/reposts.json`, util.dump(reposts));
 
    for (const repost of reposts) {
       let obj;
@@ -139,6 +154,7 @@ Log.groupStart();
       case "playlist":
       case "playlist-repost":
          obj = repost.playlist;
+         break;
       default:
          // This should be impossible because of a branch above.
          Log.error("Unrecognized Repost Type!");
@@ -171,9 +187,9 @@ for (const playlist of Object.values(playlistsToProcess)) {
 
    let outdir: string;
    if (typeof playlist.id === "string" && playlist.id.startsWith("soundcloud:system-playlists:")) {
-      outdir = `archive/playlists/${playlist.title.replace(/\s/g, "_")}`;
+      outdir = `${config.OUTPUT}/playlists/${playlist.title.replace(/\s/g, "_")}`;
    } else {
-      outdir = `archive/playlists/${playlist.id}`;
+      outdir = `${config.OUTPUT}/playlists/${playlist.id}`;
    }
 
    fs.mkdirSync(outdir, {recursive: true});
@@ -204,7 +220,7 @@ for (const track of tracksToProcess2) {
 Log.groupEnd();
 
 async function downloadTrack(track: sc.Track): Promise<"downloaded" | "cached" | "failure"> {
-   const outdir = `archive/tracks/${track.id}`;
+   const outdir = `${config.OUTPUT}/tracks/${track.id}`;
    fs.mkdirSync(outdir, {recursive: true});
 
    Log.info(`${colors.blue}${track.user.permalink.padEnd(maxUsernameTracks)} - ${colors.cyan}${track.title}`)
@@ -260,7 +276,7 @@ async function downloadTranscoding(trans: sc.Transcoding, track: sc.Track): Prom
    }
 
    const ext = util.codecName(trans.preset);
-   const outfile = `archive/tracks/${track.id}/${trans.preset}.${ext}`;
+   const outfile = `${config.OUTPUT}/tracks/${track.id}/${trans.preset}.${ext}`;
 
    if (fs.existsSync(outfile)) {
       Log.info(`${colors.grey}Already present at ${outfile}${colors.reset}`);

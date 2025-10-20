@@ -7,15 +7,15 @@
 ## Archival Structure
 
 ```ts
-archive/
+{config.OUTPUT}/
    likes.json
    reposts.json
    playlists.json
 
    playlists/
-      {playlist.id}.json
-      artwork.jpg
-      meta.json
+      {playlist.id}/
+         playlist.json
+         artwork.jpg
    tracks/
       {track.id}/
          track.json
