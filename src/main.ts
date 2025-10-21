@@ -212,7 +212,7 @@ for (const track of tracksToProcess2) {
    const whatHappened = await downloadTrack(track);
    if (whatHappened === "downloaded") {
       progress.endProfile(startProgress);
-      Log.info(`Time remaining: ${progress}`);
+      Log.info(`Progress: ${progress}`);
    } else {
       // not an accurate estimate of how long it will take
       progress.bump();
@@ -225,7 +225,7 @@ if (trackFailures.length === 0) {
    Log.info("Failed to download the following tracks:");
    Log.groupStart();
    for (const track of trackFailures) {
-      Log.info(`${colors.blue}${track.user.permalink.padStart(maxUsernameTracks)} - ${colors.cyan}${track.title}`)
+      Log.info(`${colors.blue}${track.user.permalink.padStart(maxUsernameTracks)} - ${colors.cyan}${track.title}${colors.reset}`)
    }
 }
 Log.groupEnd();
@@ -234,7 +234,7 @@ async function downloadTrack(track: sc.Track): Promise<"downloaded" | "cached" |
    const outdir = `${config.OUTPUT}/tracks/${track.id}`;
    fs.mkdirSync(outdir, {recursive: true});
 
-   Log.info(`${colors.blue}${track.user.permalink.padEnd(maxUsernameTracks)} - ${colors.cyan}${track.title}`)
+   Log.info(`${colors.blue}${track.user.permalink.padEnd(maxUsernameTracks)} - ${colors.cyan}${track.title}${colors.reset}`)
    Log.groupStart();
 
    let cached;

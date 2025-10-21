@@ -18,8 +18,11 @@ opts += --packages=external
 build:
 	esbuild src/main.ts $(opts) --outfile=tmp/js/main.js
 
-cache~clear_m3u8: tmp/js/scripts/index.js
+cache~clear_m3u8: tmp/js/scripts/cache.js
 	node $< clear_m3u8
+
+cache~clear_all: tmp/js/scripts/cache.js
+	node $< clear_all
 
 migrate~%:
 	esbuild migrate/$*.ts $(opts) --outfile=tmp/js/migrate/$*.js

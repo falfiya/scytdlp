@@ -36,6 +36,10 @@ export class Progress {
          return "0s";
       }
 
+      const digits = this.total.toString().length;
+      const done = this.profiled + this.nonprofiled + "";
+      const units = `${done.padStart(digits)}/${this.total}`;
+
       let secondsLeft = averageTimePerUnit * reminaing;
 
       const hours = secondsLeft / 3600 | 0;
@@ -52,7 +56,7 @@ export class Progress {
             return "1m";
          }
 
-         return `${minutes} minutes`;
+         return `${units} ${minutes} minutes`;
       }
 
       if (minutes === 0) {
@@ -60,7 +64,7 @@ export class Progress {
             return "1h";
          }
 
-         return `${hours}h 0m`;
+         return `${units} ${hours}h 0m`;
       }
 
       if (minutes === 1) {
@@ -68,9 +72,9 @@ export class Progress {
             return "1h 1m";
          }
 
-         return `${hours}h 1m`;
+         return `${units} ${hours}h 1m`;
       }
 
-      return `${hours}h ${minutes}m`;
+      return `${units} ${hours}h ${minutes}m`;
    }
 }
